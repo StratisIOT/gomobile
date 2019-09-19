@@ -5,10 +5,12 @@
 package bind
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/constant"
 	"go/types"
 	"html"
+	"io/ioutil"
 	"math"
 	"reflect"
 	"regexp"
@@ -228,6 +230,21 @@ func (g *JavaGen) GenClass(idx int) error {
 	return nil
 }
 
+func (g *JavaGen) GenWrapperClass(idx int) error {
+	ns := len(g.structs)
+	if idx < ns {
+		s := g.structs[idx]
+		g.genWrapperStruct(s)
+		// } else {
+		// 	iface := g.interfaces[idx-ns]
+		// 	g.genInterface(iface)
+	}
+	if len(g.err) > 0 {
+		return g.err
+	}
+	return nil
+}
+
 func (g *JavaGen) genProxyImpl(name string) {
 	g.Printf("private final int refnum;\n\n")
 	g.Printf("@Override public final int incRefnum() {\n")
@@ -276,13 +293,16 @@ func (g *JavaGen) genStruct(s structInfo) {
 		}
 	}
 
-	doc := g.docs[n]
-	g.javadoc(doc.Doc())
-	g.Printf("public final class %s", n)
-	if jinf != nil {
-		if jinf.extends != nil {
-			g.Printf(" extends %s", g.javaTypeName(jinf.extends.Name))
-		}
+	g.Printf("public class %s", n)
+	lookupTable := g.getLookupTable()
+
+	// if jinf != nil {
+	// 	if jinf.extends != nil {
+	// 		g.Printf(" extends %s", g.javaTypeName(jinf.extends.Name))
+	// 	}
+	// }
+	if lookupTable[n] != "" {
+		g.Printf(" extends %s", lookupTable[n])
 	}
 	if len(impls) > 0 {
 		g.Printf(" implements %s", strings.Join(impls, ", "))
@@ -315,12 +335,16 @@ func (g *JavaGen) genStruct(s structInfo) {
 			g.Printf("// skipped field %s.%s with unsupported type: %s\n\n", n, f.Name(), t)
 			continue
 		}
-
-		fdoc := doc.Member(f.Name())
-		g.javadoc(fdoc)
+		// fdoc := doc.Member(f.Name())
+		// g.javadoc(fdoc)
 		g.Printf("public final native %s get%s();\n", g.javaType(f.Type()), f.Name())
-		g.javadoc(fdoc)
+		// g.javadoc(fdoc)
 		g.Printf("public final native void set%s(%s v);\n\n", f.Name(), g.javaType(f.Type()))
+
+		name := lookupTable[f.Name()]
+		split := strings.Split(name, ".")
+		name = lowerFirst(split[len(split)-1])
+		g.Printf("public final %s %s = get%s();\n", g.javaType(f.Type()), name, f.Name())
 	}
 
 	var isStringer bool
@@ -329,7 +353,7 @@ func (g *JavaGen) genStruct(s structInfo) {
 			g.Printf("// skipped method %s.%s with unsupported parameter or return types\n\n", n, m.Name())
 			continue
 		}
-		g.javadoc(doc.Member(m.Name()))
+		// g.javadoc(doc.Member(m.Name()))
 		var jm *java.Func
 		hasThis := false
 		if jinf != nil {
@@ -352,6 +376,56 @@ func (g *JavaGen) genStruct(s structInfo) {
 
 	g.Outdent()
 	g.Printf("}\n\n")
+}
+
+func (g *JavaGen) genWrapperStruct(s structInfo) {
+	pkgPath := ""
+	if g.Pkg != nil {
+		pkgPath = g.Pkg.Path()
+	}
+	obfName := g.javaTypeName(s.obj.Name())
+	lookupTable := g.getLookupTable()
+	originalName := lookupTable[obfName]
+	g.Printf(javaPreamble, g.javaPkgName(g.Pkg), originalName, g.gobindOpts(), pkgPath)
+
+	fields := exportedFields(s.t)
+
+	// doc := g.docs[obfName]
+	// g.javadoc(doc.Doc())
+	g.Printf("public abstract class %s ", originalName)
+	g.Printf(" {\n")
+	g.Indent()
+
+	g.Printf("static { %s.touch(); }\n\n", g.className())
+	// g.Printf("private final %s parent = new %s();\n", obfName, obfName)
+	for _, f := range fields {
+		if t := f.Type(); !g.isSupported(t) {
+			g.Printf("// skipped field %s.%s with unsupported type: %s\n\n", obfName, f.Name(), t)
+			continue
+		}
+		name := lookupTable[f.Name()]
+		split := strings.Split(name, ".")
+		name = lowerFirst(split[len(split)-1])
+		// g.Printf("public final %s %s = new %s().get%s();", g.javaType(f.Type()), name, obfName, f.Name())
+		g.Printf("public %s %s = %s;\n", g.javaType(f.Type()), name, genDefaultType(g.javaType(f.Type())))
+	}
+
+	g.Outdent()
+	g.Printf("}\n\n")
+}
+
+func genDefaultType(typeString string) string {
+	if typeString == "byte" {
+		return "0"
+	} else if typeString == "long" {
+		return "0L"
+	} else if typeString == "double" {
+		return "0.0d"
+	} else if typeString == "boolean" {
+		return "false"
+	} else {
+		return "null"
+	}
 }
 
 // isConsSigSupported reports whether the generators can handle a given
@@ -637,7 +711,7 @@ func (g *JavaGen) jniType(T types.Type) string {
 		case types.String, types.UntypedString:
 			return "jstring"
 		default:
-			g.errorf("unsupported basic type: %s", T)
+			g.errorf("jniType unsupported basic type: %s", T)
 			return "TODO"
 		}
 	case *types.Slice:
@@ -682,7 +756,7 @@ func (g *JavaGen) javaBasicType(T *types.Basic) string {
 	case types.String, types.UntypedString:
 		return "String"
 	default:
-		g.errorf("unsupported basic type: %s", T)
+		// g.errorf("javaBasicType unsupported basic type: %s", T)
 		return "TODO"
 	}
 }
@@ -727,7 +801,8 @@ func (g *JavaGen) javaType(T types.Type) string {
 			return g.javaTypeName(clsName)
 		}
 	default:
-		g.errorf("unsupported javaType: %#+v, %s\n", T, T)
+		fmt.Println("unsupported javaType: %#+v, %s\n", T, T)
+		// g.errorf("unsupported javaType: %#+v, %s\n", T, T)
 	}
 	return "TODO"
 }
@@ -867,13 +942,13 @@ func (g *JavaGen) genVar(o *types.Var) {
 	}
 	jType := g.javaType(o.Type())
 
-	doc := g.docs[o.Name()].Doc()
+	// doc := g.docs[o.Name()].Doc()
 	// setter
-	g.javadoc(doc)
+	// g.javadoc(doc)
 	g.Printf("public static native void set%s(%s v);\n", o.Name(), jType)
 
 	// getter
-	g.javadoc(doc)
+	// g.javadoc(doc)
 	g.Printf("public static native %s get%s();\n\n", jType, o.Name())
 }
 
@@ -1071,7 +1146,7 @@ func (g *JavaGen) genConst(o *types.Const) {
 		}
 		val = fmt.Sprintf("%g", f)
 	}
-	g.javadoc(g.docs[o.Name()].Doc())
+	// g.javadoc(g.docs[o.Name()].Doc())
 	g.Printf("public static final %s %s = %s;\n", g.javaType(o.Type()), o.Name(), val)
 }
 
@@ -1386,7 +1461,7 @@ func (g *JavaGen) jniCallType(t types.Type) string {
 		case types.String, types.UntypedString:
 			return "Object"
 		default:
-			g.errorf("unsupported basic type: %s", t)
+			g.errorf("jniCallType unsupported basic type: %s", t)
 		}
 	case *types.Slice:
 		return "Object"
@@ -1435,7 +1510,7 @@ func (g *JavaGen) jniSigType(T types.Type) string {
 		case types.String, types.UntypedString:
 			return "Ljava/lang/String;"
 		default:
-			g.errorf("unsupported basic type: %s", T)
+			g.errorf("jniSigType unsupported basic type: %s", T)
 			return "TODO"
 		}
 	case *types.Slice:
@@ -1587,13 +1662,183 @@ func (g *JavaGen) GenC() error {
 	return nil
 }
 
-func (g *JavaGen) GenJava() error {
+func (g *JavaGen) getLookupTable() map[string]string {
+	dat, err := ioutil.ReadFile("src/obfuscated/map.json")
+	if err != nil {
+		fmt.Println("******************************************")
+		fmt.Println(err)
+	}
+
+	reverseLookup := map[string]string{}
+	err = json.Unmarshal([]byte(string(dat)), &reverseLookup)
+	if err != nil {
+		fmt.Println("******************************************")
+		fmt.Println(err)
+	}
+	return reverseLookup
+}
+
+func (g *JavaGen) GenWrapper(pkgDir string, java Ret) error {
+	funcs := java.Funcs
+	consts := java.Consts
+	vars := java.Vars
+	classNames := java.ClassNames
+
+	pkgPath := ""
+	if g.Pkg != nil {
+		pkgPath = g.Pkg.Path()
+	}
+	reverseLookup := g.getLookupTable()
+
+	fmt.Println(g.javaPkgName(g.Pkg))
+	g.Printf(javaPreamble, g.javaPkgName(g.Pkg), g.className(), g.gobindOpts(), pkgPath)
+	g.Printf("import iomepejagfgocjffjnfe.Iomepejagfgocjffjnfe;\n")
+	g.Printf("public class Stratislibrary {\n")
+	g.Indent()
+
+	for _, c := range consts {
+		x := fmt.Sprintf("public static final %s %s = Iomepejagfgocjffjnfe.%s;\n", g.javaType(c.Type()), reverseLookup[c.Name()], c.Name())
+		g.Printf(x)
+	}
+
+	for _, v := range vars {
+		if g.javaType(v.Type()) == "TODO" {
+			continue
+		}
+		x := fmt.Sprintf("public static final %s %s = Iomepejagfgocjffjnfe.get%s();\n", g.javaType(v.Type()), reverseLookup[v.Name()], v.Name())
+		g.Printf(x)
+	}
+
+	for _, cn := range classNames {
+		originalName := reverseLookup[cn]
+		if originalName == "" || originalName == "NativeLogger" {
+			continue
+		}
+		g.Printf("public static final %s %s = new %s();\n", originalName, originalName, cn)
+	}
+
+	for _, f := range funcs {
+		sig := f.Type().(*types.Signature)
+		res := sig.Results()
+
+		var returnsError bool
+		var ret string
+		switch res.Len() {
+		case 2:
+			if !isErrorType(res.At(1).Type()) {
+				g.errorf("second result value must be of type error: %s", f)
+				return nil
+			}
+			returnsError = true
+			ret = g.javaType(res.At(0).Type())
+		case 1:
+			if isErrorType(res.At(0).Type()) {
+				returnsError = true
+				ret = "void"
+			} else {
+				ret = g.javaType(res.At(0).Type())
+			}
+		case 0:
+			ret = "void"
+		default:
+			g.errorf("too many result values: %s", f)
+			return nil
+		}
+
+		if reverseLookup[ret] != "" {
+			// ret = fmt.Sprintf("Iomepejagfgocjffjnfe.%s", reverseLookup[ret])
+			ret = reverseLookup[ret]
+		}
+		if ret == "TODO" || ret == "byte[][]" {
+			continue
+		}
+		g.Printf("public static ")
+		g.Printf("%s ", ret)
+
+		g.Printf(lowerFirst(reverseLookup[f.Name()]))
+		g.Printf("(")
+		g.genWrapperFuncArgs(f, reverseLookup)
+		g.Printf(")")
+		if returnsError {
+			g.Printf(" throws Exception")
+		}
+		g.Printf(" {\n")
+
+		g.Indent()
+		if ret == "void" {
+			g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+			g.Printf("(")
+			g.genProxyArgs(f, reverseLookup)
+			g.Printf(");\n")
+		} else {
+			if reverseLookup[ret] == "" {
+				g.Printf("return ")
+				g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+				g.Printf("(")
+				g.genProxyArgs(f, reverseLookup)
+				g.Printf(");\n")
+			} else {
+				g.Printf("return ")
+				g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+				g.Printf("(")
+				g.genProxyArgs(f, reverseLookup)
+				g.Printf(");\n")
+			}
+		}
+
+		g.Outdent()
+
+		g.Printf("}\n")
+	}
+
+	g.Outdent()
+	g.Printf("}\n")
+
+	return nil
+}
+
+func (g *JavaGen) genWrapperFuncArgs(f *types.Func, lookup map[string]string) {
+	sig := f.Type().(*types.Signature)
+	params := sig.Params()
+	first := 0
+	for i := first; i < params.Len(); i++ {
+		if i > first {
+			g.Printf(", ")
+		}
+		v := params.At(i)
+		name := lookup[g.paramName(params, i)]
+		if name == "" {
+			// Guard any case where a param was not translated
+			name = g.paramName(params, i)
+		}
+		jt := g.javaType(v.Type())
+		g.Printf("%s %s", jt, name)
+	}
+}
+
+func (g *JavaGen) genProxyArgs(f *types.Func, lookup map[string]string) {
+	sig := f.Type().(*types.Signature)
+	params := sig.Params()
+	first := 0
+	for i := first; i < params.Len(); i++ {
+		if i > first {
+			g.Printf(", ")
+		}
+		name := lookup[g.paramName(params, i)]
+		if name == "" {
+			// Guard any case where a param was not translated
+			name = g.paramName(params, i)
+		}
+		g.Printf(name)
+	}
+}
+
+func (g *JavaGen) GenJava() Ret {
 	pkgPath := ""
 	if g.Pkg != nil {
 		pkgPath = g.Pkg.Path()
 	}
 	g.Printf(javaPreamble, g.javaPkgName(g.Pkg), g.className(), g.gobindOpts(), pkgPath)
-
 	g.Printf("public abstract class %s {\n", g.className())
 	g.Indent()
 	g.Printf("static {\n")
@@ -1655,7 +1900,7 @@ func (g *JavaGen) GenJava() error {
 			g.Printf("// skipped function %s with unsupported parameter or return types\n\n", f.Name())
 			continue
 		}
-		g.javadoc(g.docs[f.Name()].Doc())
+		// g.javadoc(g.docs[f.Name()].Doc())
 		g.Printf("public static native ")
 		g.genFuncSignature(f, nil, false)
 	}
@@ -1663,10 +1908,22 @@ func (g *JavaGen) GenJava() error {
 	g.Outdent()
 	g.Printf("}\n")
 
-	if len(g.err) > 0 {
-		return g.err
+	// if len(g.err) > 0 {
+	// 	return g.err
+	// }
+
+	return Ret{
+		Funcs:  g.funcs,
+		Consts: g.constants,
+		Vars:   g.vars,
 	}
-	return nil
+}
+
+type Ret struct {
+	Funcs      []*types.Func
+	Consts     []*types.Const
+	Vars       []*types.Var
+	ClassNames []string
 }
 
 // embeddedJavaClasses returns the possible empty list of Java types embedded

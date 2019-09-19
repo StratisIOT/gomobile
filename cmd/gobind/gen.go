@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -56,11 +57,14 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 
 		pkgname := bind.JavaPkgName(*javaPkg, p)
 		pkgDir := strings.Replace(pkgname, ".", "/", -1)
+
 		buf.Reset()
 		w, closer := writer(filepath.Join("java", pkgDir, fname))
-		processErr(g.GenJava())
+		ret := g.GenJava()
+		ret.ClassNames = g.ClassNames()
 		io.Copy(w, &buf)
 		closer()
+
 		for i, name := range g.ClassNames() {
 			buf.Reset()
 			w, closer := writer(filepath.Join("java", pkgDir, name+".java"))
@@ -68,11 +72,43 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 			io.Copy(w, &buf)
 			closer()
 		}
+
+		dat, err := ioutil.ReadFile("src/obfuscated/map.json")
+		if err != nil {
+			fmt.Println("******************************************")
+			fmt.Println(err)
+		}
+
+		reverseLookup := map[string]string{}
+		err = json.Unmarshal([]byte(string(dat)), &reverseLookup)
+		if err != nil {
+			fmt.Println("******************************************")
+			fmt.Println(err)
+		}
+
+		for i, name := range g.ClassNames() {
+			if reverseLookup[name] == "NativeLogger" {
+				continue
+			}
+			buf.Reset()
+			w, closer := writer(filepath.Join("java", pkgDir, reverseLookup[name]+".java"))
+			processErr(g.GenWrapperClass(i))
+			io.Copy(w, &buf)
+			closer()
+		}
+
+		buf.Reset()
+		w, closer = writer(filepath.Join("java", pkgDir, "Stratislibrary.java"))
+		processErr(g.GenWrapper(pkgDir, ret))
+		io.Copy(w, &buf)
+		closer()
+
 		buf.Reset()
 		w, closer = writer(filepath.Join("src", "gobind", pname+"_android.c"))
 		processErr(g.GenC())
 		io.Copy(w, &buf)
 		closer()
+
 		buf.Reset()
 		w, closer = writer(filepath.Join("src", "gobind", pname+"_android.h"))
 		processErr(g.GenH())
