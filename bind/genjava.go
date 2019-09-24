@@ -1709,7 +1709,7 @@ func (g *JavaGen) GenJava() error {
 		}
 
 		// if reverseLookup[ret] != "" {
-		// 	ret = fmt.Sprintf("Iomepejagfgocjffjnfe.%s", reverseLookup[ret])
+		// 	ret = fmt.Sprintf("Stratislibrary.%s", reverseLookup[ret])
 		// 	ret = reverseLookup[ret]
 		// }
 		if ret == "TODO" || ret == "byte[][]" {
@@ -1729,20 +1729,20 @@ func (g *JavaGen) GenJava() error {
 
 		g.Indent()
 		if ret == "void" {
-			g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+			g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
 			g.Printf("(")
 			g.genProxyArgs(f, reverseLookup)
 			g.Printf(");\n")
 		} else {
 			if reverseLookup[ret] == "" {
 				g.Printf("return ")
-				g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+				g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
 				g.Printf("(")
 				g.genProxyArgs(f, reverseLookup)
 				g.Printf(");\n")
 			} else {
 				g.Printf("return ")
-				g.Printf("Iomepejagfgocjffjnfe.%s", lowerFirst(f.Name()))
+				g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
 				g.Printf("(")
 				g.genProxyArgs(f, reverseLookup)
 				g.Printf(");\n")
@@ -1755,7 +1755,7 @@ func (g *JavaGen) GenJava() error {
 	}
 
 	for _, c := range g.constants {
-		x := fmt.Sprintf("public static final %s %s = Iomepejagfgocjffjnfe.%s;\n", g.javaType(c.Type()), reverseLookup[c.Name()], c.Name())
+		x := fmt.Sprintf("public static final %s %s = Stratislibrary.%s;\n", g.javaType(c.Type()), reverseLookup[c.Name()], c.Name())
 		g.Printf(x)
 	}
 
@@ -1763,7 +1763,7 @@ func (g *JavaGen) GenJava() error {
 		if g.javaType(v.Type()) == "TODO" {
 			continue
 		}
-		x := fmt.Sprintf("public static final %s %s = Iomepejagfgocjffjnfe.get%s();\n", g.javaType(v.Type()), reverseLookup[v.Name()], v.Name())
+		x := fmt.Sprintf("public static final %s %s = Stratislibrary.get%s();\n", g.javaType(v.Type()), reverseLookup[v.Name()], v.Name())
 		g.Printf(x)
 	}
 
