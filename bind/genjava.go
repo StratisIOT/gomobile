@@ -230,11 +230,48 @@ func (g *JavaGen) GenClass(idx int) error {
 	return nil
 }
 
+func (g *JavaGen) GenWrapperClass(idx int) error {
+	ns := len(g.structs)
+	if idx < ns {
+		s := g.structs[idx]
+		g.genWrapperStruct(s)
+	}
+	if len(g.err) > 0 {
+		return g.err
+	}
+	return nil
+}
+
 func (g *JavaGen) genProxyImpl(name string) {
 	g.Printf("private final int refnum;\n\n")
 	g.Printf("@Override public final int incRefnum() {\n")
 	g.Printf("      Seq.incGoRef(refnum, this);\n")
 	g.Printf("      return refnum;\n")
+	g.Printf("}\n\n")
+}
+
+func (g *JavaGen) genWrapperStruct(s structInfo) {
+	lookupTable := g.getLookupTable()
+	n := g.javaTypeName(s.obj.Name())
+
+	g.Printf("package %s;\n\n", g.javaPkgName(g.Pkg))
+
+	g.Printf("public class %s extends %s {\n", lookupTable[n], n)
+	g.Indent()
+	g.Printf("%s parent;\n\n", n)
+	g.Printf("public %s(%s parent) {\n", lookupTable[n], n)
+	g.Indent()
+	g.Printf("this.parent = parent;\n")
+	g.Outdent()
+	g.Printf("}\n")
+
+	g.Printf("public %s() {\n", lookupTable[n])
+	g.Indent()
+	g.Printf("this.parent = new %s();\n", n)
+	g.Outdent()
+	g.Printf("}\n")
+
+	g.Outdent()
 	g.Printf("}\n\n")
 }
 
@@ -280,7 +317,7 @@ func (g *JavaGen) genStruct(s structInfo) {
 
 	doc := g.docs[n]
 	g.javadoc(doc.Doc())
-	g.Printf("public final class %s", n)
+	g.Printf("public class %s", n)
 	if jinf != nil {
 		if jinf.extends != nil {
 			g.Printf(" extends %s", g.javaTypeName(jinf.extends.Name))
@@ -1716,15 +1753,14 @@ func (g *JavaGen) GenJava() error {
 			return nil
 		}
 
-		// if reverseLookup[ret] != "" {
-		// 	ret = fmt.Sprintf("Stratislibrary.%s", reverseLookup[ret])
-		// 	ret = reverseLookup[ret]
-		// }
 		if ret == "TODO" || ret == "byte[][]" {
 			continue
 		}
-		g.Printf("public static ")
-		g.Printf("%s ", ret)
+		if reverseLookup[ret] == "" {
+			g.Printf("public static %s ", ret)
+		} else {
+			g.Printf("public static %s ", reverseLookup[ret])
+		}
 
 		g.Printf(lowerFirst(reverseLookup[f.Name()]))
 		g.Printf("(")
@@ -1742,18 +1778,17 @@ func (g *JavaGen) GenJava() error {
 			g.genProxyArgs(f, reverseLookup)
 			g.Printf(");\n")
 		} else {
+			fmt.Println(reverseLookup[ret])
 			if reverseLookup[ret] == "" {
-				g.Printf("return ")
-				g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
+				g.Printf("return Stratislibrary.%s", lowerFirst(f.Name()))
 				g.Printf("(")
 				g.genProxyArgs(f, reverseLookup)
 				g.Printf(");\n")
 			} else {
-				g.Printf("return ")
-				g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
+				g.Printf("return new %s(Stratislibrary.%s", reverseLookup[ret], lowerFirst(f.Name()))
 				g.Printf("(")
 				g.genProxyArgs(f, reverseLookup)
-				g.Printf(");\n")
+				g.Printf("));\n")
 			}
 		}
 
