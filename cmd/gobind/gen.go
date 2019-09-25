@@ -20,10 +20,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"golang.org/x/mobile/bind"
-	"golang.org/x/mobile/internal/importers"
-	"golang.org/x/mobile/internal/importers/java"
-	"golang.org/x/mobile/internal/importers/objc"
+	"github.com/StratisIOT/gomobile/bind"
+	"github.com/StratisIOT/gomobile/internal/importers"
+	"github.com/StratisIOT/gomobile/internal/importers/java"
+	"github.com/StratisIOT/gomobile/internal/importers/objc"
 )
 
 func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types.Package, classes []*java.Class, otypes []*objc.Named) {
@@ -106,12 +106,12 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 		closer()
 		// Generate support files along with the universe package
 		if p == nil {
-			p, err := build.Default.Import("golang.org/x/mobile/bind", ".", build.ImportComment)
+			p, err := build.Default.Import("github.com/StratisIOT/gomobile/bind", ".", build.ImportComment)
 			if err != nil {
-				errorf(`"golang.org/x/mobile/bind" is not found; run go get golang.org/x/mobile/bind: %v`, err)
+				errorf(`"github.com/StratisIOT/gomobile/bind" is not found; run go get github.com/StratisIOT/gomobile/bind: %v`, err)
 				return
 			}
-			repo := filepath.Clean(filepath.Join(p.Dir, "..")) // golang.org/x/mobile directory.
+			repo := filepath.Clean(filepath.Join(p.Dir, "..")) // github.com/StratisIOT/gomobile directory.
 			for _, javaFile := range []string{"Seq.java"} {
 				src := filepath.Join(repo, "bind/java/"+javaFile)
 				in, err := os.Open(src)
@@ -127,7 +127,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 				}
 			}
 			// Copy support files
-			javaPkg, err := build.Default.Import("golang.org/x/mobile/bind/java", "", build.FindOnly)
+			javaPkg, err := build.Default.Import("github.com/StratisIOT/gomobile/bind/java", "", build.FindOnly)
 			if err != nil {
 				errorf("unable to import bind/java: %v", err)
 				return
@@ -149,7 +149,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 		genPkgH(w, "seq")
 		io.Copy(w, &buf)
 		closer()
-		bindPkg, err := build.Default.Import("golang.org/x/mobile/bind", "", build.FindOnly)
+		bindPkg, err := build.Default.Import("github.com/StratisIOT/gomobile/bind", "", build.FindOnly)
 		if err != nil {
 			errorf("unable to import bind: %v", err)
 			return
@@ -178,7 +178,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 		closer()
 		if p == nil {
 			// Copy support files
-			objcPkg, err := build.Default.Import("golang.org/x/mobile/bind/objc", "", build.FindOnly)
+			objcPkg, err := build.Default.Import("github.com/StratisIOT/gomobile/bind/objc", "", build.FindOnly)
 			if err != nil {
 				errorf("unable to import bind/objc: %v", err)
 				return

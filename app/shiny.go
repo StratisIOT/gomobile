@@ -11,10 +11,10 @@ import (
 
 	"golang.org/x/exp/shiny/driver/gldriver"
 	"golang.org/x/exp/shiny/screen"
-	"golang.org/x/mobile/event/lifecycle"
-	"golang.org/x/mobile/event/mouse"
-	"golang.org/x/mobile/event/touch"
-	"golang.org/x/mobile/gl"
+	"github.com/StratisIOT/gomobile/event/lifecycle"
+	"github.com/StratisIOT/gomobile/event/mouse"
+	"github.com/StratisIOT/gomobile/event/touch"
+	"github.com/StratisIOT/gomobile/gl"
 )
 
 func main(f func(a App)) {

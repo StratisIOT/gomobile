@@ -85,7 +85,7 @@ func TestAndroidBuild(t *testing.T) {
 	if goos == "windows" {
 		os.Setenv("HOMEDRIVE", "C:")
 	}
-	cmdBuild.flag.Parse([]string{"golang.org/x/mobile/example/basic"})
+	cmdBuild.flag.Parse([]string{"github.com/StratisIOT/gomobile/example/basic"})
 	oldTags := ctx.BuildTags
 	ctx.BuildTags = []string{"tag1"}
 	defer func() {
@@ -109,7 +109,7 @@ func TestAndroidBuild(t *testing.T) {
 var androidBuildTmpl = template.Must(template.New("output").Parse(`GOMOBILE={{.GOPATH}}/pkg/gomobile
 WORK=$WORK
 mkdir -p $WORK/lib/armeabi-v7a
-GOOS=android GOARCH=arm CC=$NDK_PATH/toolchains/llvm/prebuilt/{{.NDKARCH}}/bin/armv7a-linux-androideabi16-clang CXX=$NDK_PATH/toolchains/llvm/prebuilt/{{.NDKARCH}}/bin/armv7a-linux-androideabi16-clang++ CGO_ENABLED=1 GOARM=7 GO111MODULE=off go build -tags tag1 -x -buildmode=c-shared -o $WORK/lib/armeabi-v7a/libbasic.so golang.org/x/mobile/example/basic
+GOOS=android GOARCH=arm CC=$NDK_PATH/toolchains/llvm/prebuilt/{{.NDKARCH}}/bin/armv7a-linux-androideabi16-clang CXX=$NDK_PATH/toolchains/llvm/prebuilt/{{.NDKARCH}}/bin/armv7a-linux-androideabi16-clang++ CGO_ENABLED=1 GOARM=7 GO111MODULE=off go build -tags tag1 -x -buildmode=c-shared -o $WORK/lib/armeabi-v7a/libbasic.so github.com/StratisIOT/gomobile/example/basic
 `))
 
 func TestParseBuildTargetFlag(t *testing.T) {
@@ -160,9 +160,9 @@ func TestRegexImportGolangXPackage(t *testing.T) {
 		want    string
 		wantLen int
 	}{
-		{"ffffffff t golang.org/x/mobile", "golang.org/x/mobile", 2},
-		{"ffffffff t github.com/example/repo/vendor/golang.org/x/mobile", "golang.org/x/mobile", 2},
-		{"ffffffff t github.com/example/golang.org/x/mobile", "", 0},
+		{"ffffffff t github.com/StratisIOT/gomobile", "github.com/StratisIOT/gomobile", 2},
+		{"ffffffff t github.com/example/repo/vendor/github.com/StratisIOT/gomobile", "github.com/StratisIOT/gomobile", 2},
+		{"ffffffff t github.com/example/github.com/StratisIOT/gomobile", "", 0},
 		{"ffffffff t github.com/example/repo", "", 0},
 		{"ffffffff t github.com/example/repo/vendor", "", 0},
 	}

@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"golang.org/x/mobile/internal/importers"
+	"github.com/StratisIOT/gomobile/internal/importers"
 )
 
 func TestImport(t *testing.T) {

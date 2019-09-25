@@ -1,7 +1,7 @@
 package cgopkg
 
 import (
-	_ "golang.org/x/mobile/gl"
+	_ "github.com/StratisIOT/gomobile/gl"
 )
 
 func Dummy() {}

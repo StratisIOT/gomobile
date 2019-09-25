@@ -16,7 +16,7 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/mobile/internal/importers/java"
+	"github.com/StratisIOT/gomobile/internal/importers/java"
 )
 
 // TODO(crawshaw): disallow basic android java type names in exported symbols.
