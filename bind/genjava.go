@@ -312,6 +312,7 @@ func (g *JavaGen) genStruct(s structInfo) {
 		}
 	}
 
+	lookupTable := g.getLookupTable()
 	for _, f := range fields {
 		if t := f.Type(); !g.isSupported(t) {
 			g.Printf("// skipped field %s.%s with unsupported type: %s\n\n", n, f.Name(), t)
@@ -323,6 +324,13 @@ func (g *JavaGen) genStruct(s structInfo) {
 		g.Printf("public final native %s get%s();\n", g.javaType(f.Type()), f.Name())
 		g.javadoc(fdoc)
 		g.Printf("public final native void set%s(%s v);\n\n", f.Name(), g.javaType(f.Type()))
+
+		potentialName := strings.Split(lookupTable[f.Name()], ".")
+		if len(potentialName) == 2 {
+			g.Printf("public %s get%s() { return get%s(); }\n", g.javaType(f.Type()), potentialName[1], f.Name())
+
+			g.Printf("public void set%s(%s v) { set%s(v); }\n", potentialName[1], g.javaType(f.Type()), f.Name())
+		}
 	}
 
 	var isStringer bool
