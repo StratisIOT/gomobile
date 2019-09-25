@@ -84,7 +84,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 		}
 
 		for i, name := range g.ClassNames() {
-			if reverseLookup[name] == "NativeLogger" {
+			if reverseLookup[name] == "" {
 				continue
 			}
 			buf.Reset()

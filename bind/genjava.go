@@ -235,6 +235,9 @@ func (g *JavaGen) GenWrapperClass(idx int) error {
 	if idx < ns {
 		s := g.structs[idx]
 		g.genWrapperStruct(s)
+	} else {
+		iface := g.interfaces[idx-ns]
+		g.genWrapperInterface(iface)
 	}
 	if len(g.err) > 0 {
 		return g.err
@@ -250,12 +253,20 @@ func (g *JavaGen) genProxyImpl(name string) {
 	g.Printf("}\n\n")
 }
 
+func (g *JavaGen) genWrapperInterface(iface interfaceInfo) {
+	lookupTable := g.getLookupTable()
+	g.Printf("package %s;\n\n", g.javaPkgName(g.Pkg))
+	oldName := g.javaTypeName(iface.obj.Name())
+	newName := lookupTable[oldName]
+	g.Printf("public interface %s extends %s {\n", newName, oldName)
+	g.Printf("}\n\n")
+}
+
 func (g *JavaGen) genWrapperStruct(s structInfo) {
 	lookupTable := g.getLookupTable()
 	n := g.javaTypeName(s.obj.Name())
 
 	g.Printf("package %s;\n\n", g.javaPkgName(g.Pkg))
-
 	g.Printf("public class %s extends %s {\n", lookupTable[n], n)
 	g.Indent()
 	g.Printf("%s parent;\n\n", n)
@@ -1778,7 +1789,6 @@ func (g *JavaGen) GenJava() error {
 			g.genProxyArgs(f, reverseLookup)
 			g.Printf(");\n")
 		} else {
-			fmt.Println(reverseLookup[ret])
 			if reverseLookup[ret] == "" {
 				g.Printf("return Stratislibrary.%s", lowerFirst(f.Name()))
 				g.Printf("(")
