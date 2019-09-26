@@ -26,7 +26,7 @@ import (
 	"github.com/StratisIOT/gomobile/internal/importers/objc"
 )
 
-func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types.Package, classes []*java.Class, otypes []*objc.Named) {
+func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types.Package, classes []*java.Class, otypes []*objc.Named, obfuscate bool) {
 	fname := defaultFileName(lang, p)
 	conf := &bind.GeneratorConfig{
 		Fset:   fset,
@@ -59,7 +59,7 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 		pkgDir := strings.Replace(pkgname, ".", "/", -1)
 		buf.Reset()
 		w, closer := writer(filepath.Join("java", pkgDir, fname))
-		processErr(g.GenJava())
+		processErr(g.GenJava(obfuscate))
 		io.Copy(w, &buf)
 		closer()
 		for i, name := range g.ClassNames() {
@@ -69,29 +69,30 @@ func genPkg(lang string, p *types.Package, astFiles []*ast.File, allPkg []*types
 			io.Copy(w, &buf)
 			closer()
 		}
-
-		dat, err := ioutil.ReadFile("src/obfuscated/map.json")
-		if err != nil {
-			fmt.Println("******************************************")
-			fmt.Println(err)
-		}
-
-		reverseLookup := map[string]string{}
-		err = json.Unmarshal([]byte(string(dat)), &reverseLookup)
-		if err != nil {
-			fmt.Println("******************************************")
-			fmt.Println(err)
-		}
-
-		for i, name := range g.ClassNames() {
-			if reverseLookup[name] == "" {
-				continue
+		if obfuscate {
+			dat, err := ioutil.ReadFile("src/obfuscated/map.json")
+			if err != nil {
+				fmt.Println("******************************************")
+				fmt.Println(err)
 			}
-			buf.Reset()
-			w, closer := writer(filepath.Join("java", pkgDir, reverseLookup[name]+".java"))
-			processErr(g.GenWrapperClass(i))
-			io.Copy(w, &buf)
-			closer()
+
+			reverseLookup := map[string]string{}
+			err = json.Unmarshal([]byte(string(dat)), &reverseLookup)
+			if err != nil {
+				fmt.Println("******************************************")
+				fmt.Println(err)
+			}
+
+			for i, name := range g.ClassNames() {
+				if reverseLookup[name] == "" {
+					continue
+				}
+				buf.Reset()
+				w, closer := writer(filepath.Join("java", pkgDir, reverseLookup[name]+".java"))
+				processErr(g.GenWrapperClass(i))
+				io.Copy(w, &buf)
+				closer()
+			}
 		}
 
 		buf.Reset()

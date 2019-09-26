@@ -34,6 +34,7 @@ var (
 	bootclasspath = flag.String("bootclasspath", "", "Java bootstrap classpath.")
 	classpath     = flag.String("classpath", "", "Java classpath.")
 	tags          = flag.String("tags", "", "build tags.")
+	obfuscate     = flag.Bool("obfuscate", false, "only available for android")
 )
 
 var usage = `The Gobind tool generates Java language bindings for Go.
@@ -135,6 +136,7 @@ func run() {
 		}
 		ctx.GOPATH = srcDir + ctx.GOPATH
 		if len(classes) > 0 {
+
 			if err := genJavaPackages(srcDir, classes, jrefs.Embedders); err != nil {
 				log.Fatal(err)
 			}
@@ -166,10 +168,10 @@ func run() {
 	}
 	for _, l := range langs {
 		for i, pkg := range typePkgs {
-			genPkg(l, pkg, astPkgs[i], typePkgs, classes, otypes)
+			genPkg(l, pkg, astPkgs[i], typePkgs, classes, otypes, *obfuscate)
 		}
 		// Generate the error package and support files
-		genPkg(l, nil, nil, typePkgs, classes, otypes)
+		genPkg(l, nil, nil, typePkgs, classes, otypes, *obfuscate)
 	}
 }
 

@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-func goAndroidBind(gobind string, pkgs []*build.Package, androidArchs []string) error {
+func goAndroidBind(gobind string, pkgs []*build.Package, androidArchs []string, obfuscate bool) error {
 	if sdkDir := os.Getenv("ANDROID_HOME"); sdkDir == "" {
 		return fmt.Errorf("this command requires ANDROID_HOME environment variable (path to the Android SDK)")
 	}
@@ -41,6 +41,9 @@ func goAndroidBind(gobind string, pkgs []*build.Package, androidArchs []string) 
 	}
 	if bindBootClasspath != "" {
 		cmd.Args = append(cmd.Args, "-bootclasspath="+bindBootClasspath)
+	}
+	if obfuscate {
+		cmd.Args = append(cmd.Args, "-obfuscate")
 	}
 	for _, p := range pkgs {
 		cmd.Args = append(cmd.Args, p.ImportPath)

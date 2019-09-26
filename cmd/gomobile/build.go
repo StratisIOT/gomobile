@@ -234,6 +234,7 @@ var (
 	buildBundleID   string // -bundleid
 	buildIOSVersion string // -iosversion
 	buildAndroidAPI int    // -androidapi
+	obfuscate       bool   // -obfuscate
 )
 
 func addBuildFlags(cmd *command) {
@@ -244,6 +245,7 @@ func addBuildFlags(cmd *command) {
 	cmd.flag.StringVar(&buildBundleID, "bundleid", "", "")
 	cmd.flag.StringVar(&buildIOSVersion, "iosversion", "7.0", "")
 	cmd.flag.IntVar(&buildAndroidAPI, "androidapi", minAndroidAPI, "")
+	cmd.flag.BoolVar(&obfuscate, "obfuscate", false, "")
 
 	cmd.flag.BoolVar(&buildA, "a", false, "")
 	cmd.flag.BoolVar(&buildI, "i", false, "")

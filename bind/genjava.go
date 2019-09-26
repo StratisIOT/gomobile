@@ -1637,7 +1637,7 @@ func (g *JavaGen) getLookupTable() map[string]string {
 	return reverseLookup
 }
 
-func (g *JavaGen) GenJava() error {
+func (g *JavaGen) GenJava(obfuscate bool) error {
 	pkgPath := ""
 	if g.Pkg != nil {
 		pkgPath = g.Pkg.Path()
@@ -1709,89 +1709,92 @@ func (g *JavaGen) GenJava() error {
 		g.genFuncSignature(f, nil, false)
 	}
 
-	reverseLookup := g.getLookupTable()
-	for _, f := range g.funcs {
-		sig := f.Type().(*types.Signature)
-		res := sig.Results()
+	if obfuscate {
 
-		var returnsError bool
-		var ret string
-		switch res.Len() {
-		case 2:
-			if !isErrorType(res.At(1).Type()) {
-				g.errorf("second result value must be of type error: %s", f)
+		reverseLookup := g.getLookupTable()
+		for _, f := range g.funcs {
+			sig := f.Type().(*types.Signature)
+			res := sig.Results()
+
+			var returnsError bool
+			var ret string
+			switch res.Len() {
+			case 2:
+				if !isErrorType(res.At(1).Type()) {
+					g.errorf("second result value must be of type error: %s", f)
+					return nil
+				}
+				returnsError = true
+				ret = g.javaType(res.At(0).Type())
+			case 1:
+				if isErrorType(res.At(0).Type()) {
+					returnsError = true
+					ret = "void"
+				} else {
+					ret = g.javaType(res.At(0).Type())
+				}
+			case 0:
+				ret = "void"
+			default:
+				g.errorf("too many result values: %s", f)
 				return nil
 			}
-			returnsError = true
-			ret = g.javaType(res.At(0).Type())
-		case 1:
-			if isErrorType(res.At(0).Type()) {
-				returnsError = true
-				ret = "void"
-			} else {
-				ret = g.javaType(res.At(0).Type())
+
+			if ret == "TODO" || ret == "byte[][]" {
+				continue
 			}
-		case 0:
-			ret = "void"
-		default:
-			g.errorf("too many result values: %s", f)
-			return nil
-		}
-
-		if ret == "TODO" || ret == "byte[][]" {
-			continue
-		}
-		if reverseLookup[ret] == "" {
-			g.Printf("public static %s ", ret)
-		} else {
-			g.Printf("public static %s ", reverseLookup[ret])
-		}
-
-		g.Printf(lowerFirst(reverseLookup[f.Name()]))
-		g.Printf("(")
-		g.genWrapperFuncArgs(f, reverseLookup)
-		g.Printf(")")
-		if returnsError {
-			g.Printf(" throws Exception")
-		}
-		g.Printf(" {\n")
-
-		g.Indent()
-		if ret == "void" {
-			g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
-			g.Printf("(")
-			g.genProxyArgs(f, reverseLookup)
-			g.Printf(");\n")
-		} else {
 			if reverseLookup[ret] == "" {
-				g.Printf("return Stratislibrary.%s", lowerFirst(f.Name()))
+				g.Printf("public static %s ", ret)
+			} else {
+				g.Printf("public static %s ", reverseLookup[ret])
+			}
+
+			g.Printf(lowerFirst(reverseLookup[f.Name()]))
+			g.Printf("(")
+			g.genWrapperFuncArgs(f, reverseLookup)
+			g.Printf(")")
+			if returnsError {
+				g.Printf(" throws Exception")
+			}
+			g.Printf(" {\n")
+
+			g.Indent()
+			if ret == "void" {
+				g.Printf("Stratislibrary.%s", lowerFirst(f.Name()))
 				g.Printf("(")
 				g.genProxyArgs(f, reverseLookup)
 				g.Printf(");\n")
 			} else {
-				g.Printf("return new %s(Stratislibrary.%s", reverseLookup[ret], lowerFirst(f.Name()))
-				g.Printf("(")
-				g.genProxyArgs(f, reverseLookup)
-				g.Printf("));\n")
+				if reverseLookup[ret] == "" {
+					g.Printf("return Stratislibrary.%s", lowerFirst(f.Name()))
+					g.Printf("(")
+					g.genProxyArgs(f, reverseLookup)
+					g.Printf(");\n")
+				} else {
+					g.Printf("return new %s(Stratislibrary.%s", reverseLookup[ret], lowerFirst(f.Name()))
+					g.Printf("(")
+					g.genProxyArgs(f, reverseLookup)
+					g.Printf("));\n")
+				}
 			}
+
+			g.Outdent()
+
+			g.Printf("}\n")
 		}
 
-		g.Outdent()
-
-		g.Printf("}\n")
-	}
-
-	for _, c := range g.constants {
-		x := fmt.Sprintf("public static final %s %s = Stratislibrary.%s;\n", g.javaType(c.Type()), reverseLookup[c.Name()], c.Name())
-		g.Printf(x)
-	}
-
-	for _, v := range g.vars {
-		if g.javaType(v.Type()) == "TODO" {
-			continue
+		for _, c := range g.constants {
+			x := fmt.Sprintf("public static final %s %s = Stratislibrary.%s;\n", g.javaType(c.Type()), reverseLookup[c.Name()], c.Name())
+			g.Printf(x)
 		}
-		x := fmt.Sprintf("public static final %s %s = Stratislibrary.get%s();\n", g.javaType(v.Type()), reverseLookup[v.Name()], v.Name())
-		g.Printf(x)
+
+		for _, v := range g.vars {
+			if g.javaType(v.Type()) == "TODO" {
+				continue
+			}
+			x := fmt.Sprintf("public static final %s %s = Stratislibrary.get%s();\n", g.javaType(v.Type()), reverseLookup[v.Name()], v.Name())
+			g.Printf(x)
+		}
 	}
 
 	g.Outdent()
