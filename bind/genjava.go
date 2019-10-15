@@ -281,6 +281,21 @@ func (g *JavaGen) genWrapperStruct(s structInfo) {
 	g.Outdent()
 	g.Printf("}\n")
 
+	fields := exportedFields(s.t)
+	for _, f := range fields {
+		if t := f.Type(); !g.isSupported(t) {
+			g.Printf("// skipped field %s.%s with unsupported type: %s\n\n", n, f.Name(), t)
+			continue
+		}
+
+		potentialName := strings.Split(lookupTable[f.Name()], ".")
+		if len(potentialName) == 2 {
+			g.Printf("public %s get%s() { return this.parent.get%s(); }\n", g.javaType(f.Type()), potentialName[1], f.Name())
+		} else if len(potentialName) == 1 {
+			g.Printf("public %s get%s() { return this.parent.get%s(); }\n", g.javaType(f.Type()), potentialName[0], f.Name())
+		}
+	}
+
 	g.Outdent()
 	g.Printf("}\n\n")
 }
@@ -357,7 +372,6 @@ func (g *JavaGen) genStruct(s structInfo) {
 		}
 	}
 
-	lookupTable := g.getLookupTable()
 	for _, f := range fields {
 		if t := f.Type(); !g.isSupported(t) {
 			g.Printf("// skipped field %s.%s with unsupported type: %s\n\n", n, f.Name(), t)
@@ -366,13 +380,6 @@ func (g *JavaGen) genStruct(s structInfo) {
 
 		g.Printf("public final native %s get%s();\n", g.javaType(f.Type()), f.Name())
 		g.Printf("public final native void set%s(%s v);\n\n", f.Name(), g.javaType(f.Type()))
-
-		potentialName := strings.Split(lookupTable[f.Name()], ".")
-		if len(potentialName) == 2 {
-			g.Printf("public %s get%s() { return get%s(); }\n", g.javaType(f.Type()), potentialName[1], f.Name())
-
-			g.Printf("public void set%s(%s v) { set%s(v); }\n", potentialName[1], g.javaType(f.Type()), f.Name())
-		}
 	}
 
 	var isStringer bool
